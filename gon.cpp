@@ -203,11 +203,10 @@ GonObject GonObject::Load(std::string filename){
     in.seekg (0, std::ios::end);
     int length = in.tellg();
     in.seekg (0, std::ios::beg);
-    char * buffer = new char [length+1];
-    //std::cout << "Reading " << length << " characters... " << std::endl;
-    in.read (buffer,length);
-    buffer[length] = 0;
-    std::string str = std::string("{")+buffer+"}";
+    std::string str(length + 2, '\0');
+    in.read(&str[1], length);
+    str.front() = '{';
+    str.back() = '}';
 
     std::vector<std::string> Tokens = Tokenize(str);
 
