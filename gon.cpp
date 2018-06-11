@@ -130,12 +130,21 @@ struct TokenStream {
     }
 };
 
+GonObject::GonObject(){
+    name = "";
+    type = g_null;
+    int_data = 0;
+    float_data = 0;
+    bool_data = 0;
+    string_data = "";
+}
+
 GonObject LoadFromTokens(TokenStream& Tokens){
     GonObject ret;
 
     if(Tokens.Peek() == "{"){         //read object
         ret.type = GonObject::g_object;
-        
+
         Tokens.Read(); //consume '{'
 
         while(Tokens.Peek() != "}"){
@@ -228,6 +237,7 @@ GonObject GonObject::LoadFromBuffer(std::string buffer){
     return LoadFromTokens(ts);
 }
 
+//options with error throwing
 std::string GonObject::String() const {
     if(type != g_string && type != g_number && type != g_bool && type != g_null) throw "GSON ERROR: Field is not a string";
     return string_data;
@@ -242,6 +252,24 @@ double GonObject::Number() const {
 }
 bool GonObject::Bool() const {
     if(type != g_bool) throw "GON ERROR: Field is not a bool";
+    return bool_data;
+}
+
+//options with a default value
+std::string GonObject::String(std::string _default) const {
+    if(type != g_string && type != g_number && type != g_bool && type != g_null) return _default;
+    return string_data;
+}
+int GonObject::Int(int _default) const {
+    if(type != g_number) return _default;
+    return int_data;
+}
+double GonObject::Number(double _default) const {
+    if(type != g_number) return _default;
+    return float_data;
+}
+bool GonObject::Bool(bool _default) const {
+    if(type != g_bool) return _default;
     return bool_data;
 }
 
@@ -262,8 +290,12 @@ bool GonObject::Contains(int child) const{
     if(child >= children_array.size()) return false;
     return true;
 }
+bool GonObject::Exists() const{
+    return type != g_null;
+}
 
 const GonObject& GonObject::operator[](std::string child) const {
+    if(type == g_null) return null_gon;
     if(type != g_object) throw "GON ERROR: Field is not an object";
 
     std::map<std::string, int>::const_iterator iter = children_map.find(child);
@@ -271,7 +303,8 @@ const GonObject& GonObject::operator[](std::string child) const {
         return children_array[iter->second];
     }
 
-    throw "GON ERROR: Field not found: "+child;
+    return null_gon;
+    //throw "GON ERROR: Field not found: "+child;
 }
 const GonObject& GonObject::operator[](int childindex) const {
     if(type != g_object && type != g_array) return *this;//throw "GSON ERROR: Field is not an object or array";
@@ -287,17 +320,17 @@ int GonObject::Length() const {
 void GonObject::DebugOut(){
     if(type == g_object){
         std::cout << name << " is object {" << std::endl;
-            for(int i = 0; i<children_array.size(); i++){
-                children_array[i].DebugOut();
-            }
+        for(int i = 0; i<children_array.size(); i++){
+            children_array[i].DebugOut();
+        }
         std::cout << "}" << std::endl;
     }
 
     if(type == g_array){
         std::cout << name << " is array [" << std::endl;
-            for(int i = 0; i<children_array.size(); i++){
-                children_array[i].DebugOut();
-            }
+        for(int i = 0; i<children_array.size(); i++){
+            children_array[i].DebugOut();
+        }
         std::cout << "]" << std::endl;
     }
 
@@ -368,3 +401,5 @@ std::string GonObject::getOutStr(){
 
     return out;
 }
+
+GonObject GonObject::null_gon;
