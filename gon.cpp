@@ -239,7 +239,7 @@ GonObject GonObject::LoadFromBuffer(std::string buffer){
 
 //options with error throwing
 std::string GonObject::String() const {
-    if(type != g_string && type != g_number && type != g_bool && type != g_null) throw "GSON ERROR: Field is not a string";
+    if(type != g_string && type != g_number && type != g_bool) throw "GSON ERROR: Field is not a string";
     return string_data;
 }
 int GonObject::Int() const {
@@ -257,7 +257,7 @@ bool GonObject::Bool() const {
 
 //options with a default value
 std::string GonObject::String(std::string _default) const {
-    if(type != g_string && type != g_number && type != g_bool && type != g_null) return _default;
+    if(type != g_string && type != g_number && type != g_bool) return _default;
     return string_data;
 }
 int GonObject::Int(int _default) const {
