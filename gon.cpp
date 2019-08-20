@@ -144,6 +144,14 @@ struct TokenStream {
         }
         return Tokens[current];
     }
+
+    void Consume(){ //avoid anonymous string creation/destruction
+        if(current>=Tokens.size()){
+            error = true;
+            return;
+        }
+        current++;
+    }
 };
 
 GonObject::GonObject(){
@@ -161,8 +169,7 @@ GonObject LoadFromTokens(TokenStream& Tokens){
     if(Tokens.Peek() == "{"){         //read object
         ret.type = GonObject::FieldType::OBJECT;
 
-        Tokens.Read(); //consume '{'
-
+        Tokens.Consume(); //consume '{'
         while(Tokens.Peek() != "}"){
             std::string name = Tokens.Read();
 
@@ -175,14 +182,13 @@ GonObject LoadFromTokens(TokenStream& Tokens){
                 return GonObject::null_gon;
             }
         }
-
-        Tokens.Read(); //consume '}'
+        Tokens.Consume(); //consume '}'
 
         return ret;
     } else if(Tokens.Peek() == "["){  //read array
         ret.type = GonObject::FieldType::ARRAY;
 
-        Tokens.Read(); //consume '['
+        Tokens.Consume(); //consume '['
         while(Tokens.Peek() != "]"){
             ret.children_array.push_back(LoadFromTokens(Tokens));
 
@@ -191,7 +197,7 @@ GonObject LoadFromTokens(TokenStream& Tokens){
                 return GonObject::null_gon;
             }
         }
-        Tokens.Read(); //consume ']'
+        Tokens.Consume(); //consume ']'
 
         return ret;
     } else {                          //read data value

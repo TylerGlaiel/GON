@@ -10,6 +10,7 @@
 class GonObject {
     public:
         static const GonObject null_gon;
+
         //default just throws the string, can be set if you want to avoid exceptions
         static std::function<void(std::string)> OnError;
 
@@ -29,14 +30,12 @@ class GonObject {
             OVERWRITE
         };
 
-
         std::map<std::string, int> children_map;
         std::vector<GonObject> children_array;
         int int_data;
         double float_data;
         bool bool_data;
         std::string string_data;
-
         std::string name;
         FieldType type;
 
@@ -91,23 +90,22 @@ class GonObject {
         std::string GetOutStr(std::string tab = "    ", std::string current_tab = "");
 
         //merging/combining functions
-        //if self and other are a gon_object: other will be appended to self
-        //if self and other are a gon_array: other will be appended to self
-        //if self is a null gon, overwrite self with other
+        //if self and other are an OBJECT: other will be appended to self
+        //if self and other are an ARRAY: other will be appended to self
+        //if self is a null gon: overwrite self with other
         //otherwise: error
         //(note if a field with the same name is used multiple times, the most recently added one is mapped to the associative array lookup table, however duplicate fields will still exist)
         void Append(const GonObject& other);
 
-        //if self and other are a gon_object: fields with matching names will be overwritten, new fields appended
-        //if self and other are a gon_array: other will be appended to self
-        //if self is a null gon, overwrite self with other
+        //if self and other are an OBJECT: fields with matching names will be overwritten, new fields appended
+        //if self and other are an ARRAY: other will be appended to self
+        //if self is a null gon: overwrite self with other
         //otherwise: error
         //(OnOverwrite can be specified if you want a warning or error if gons contain overlapping members)
-        void ShallowMerge(const GonObject& other, std::function<void(const GonObject& a, const GonObject& b)> OnOverwrite = NULL);
+        void ShallowMerge(const GonObject& other, std::function<void(const GonObject& a, const GonObject& b)> OnOverwrite = NULL);                                     
                                                   
-                                                  
-        //if self and other are a gon_object: fields with matching names will be DeepMerged, new fields appended
-        //if self and other are a gon_array: fields with matching indexes will be DeepMerged, additional fields appended
+        //if self and other are an OBJECT: fields with matching names will be DeepMerged, new fields appended
+        //if self and other are an ARRAY: fields with matching indexes will be DeepMerged, additional fields appended
         //if self and other mismatch: other will overwrite self
         //ObjectMergePolicy and ArrayMergePolicy can be specified if you want to change how fields merge on a per-field basis
         void DeepMerge(const GonObject& other, MergePolicyCallback ObjectMergePolicy = MergePolicyDeepMerge, MergePolicyCallback ArrayMergePolicy = MergePolicyDeepMerge);
