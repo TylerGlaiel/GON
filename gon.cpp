@@ -5,22 +5,22 @@
 #include <string>
 #include <cstdlib>
 
-bool IsWhitespace(char c){
+static bool IsWhitespace(char c){
     return c==' '||c=='\n'||c=='\r'||c=='\t';
 }
 
-bool IsSymbol(char c){
+static bool IsSymbol(char c){
     return c=='='||c==','||c==':'||c=='{'||c=='}'||c=='['||c==']';
 }
-bool IsIgnoredSymbol(char c){
+static bool IsIgnoredSymbol(char c){
     return c=='='||c==','||c==':';
 }
 
-void ThrowString(std::string err){
+static void DefaultGonErrorCallback(std::string err){
     throw err;
 }
 
-std::function<void(std::string)> GonObject::OnError = ThrowString;
+std::function<void(std::string)> GonObject::ErrorCallback = DefaultGonErrorCallback;
 const GonObject GonObject::null_gon;
 
 GonObject::MergeMode GonObject::MergePolicyAppend(const GonObject& field_a, const GonObject& field_b){
@@ -33,7 +33,7 @@ GonObject::MergeMode GonObject::MergePolicyOverwrite(const GonObject& field_a, c
     return MergeMode::OVERWRITE;
 }
 
-std::vector<std::string> Tokenize(std::string data){
+static std::vector<std::string> Tokenize(std::string data){
     std::vector<std::string> tokens;
 
     bool inString = false;
@@ -121,12 +121,12 @@ std::vector<std::string> Tokenize(std::string data){
     return tokens;
 }
 
-struct TokenStream {
+struct GonTokenStream {
     std::vector<std::string> Tokens;
     int current;
     bool error;
 
-    TokenStream():current(0),error(false){
+    GonTokenStream():current(0),error(false){
     }
 
     std::string Read(){
@@ -163,7 +163,7 @@ GonObject::GonObject(){
     string_data = "";
 }
 
-GonObject LoadFromTokens(TokenStream& Tokens){
+static GonObject LoadFromTokens(GonTokenStream& Tokens){
     GonObject ret;
 
     if(Tokens.Peek() == "{"){         //read object
@@ -178,7 +178,7 @@ GonObject LoadFromTokens(TokenStream& Tokens){
             ret.children_array[ret.children_array.size()-1].name = name;
 
             if(Tokens.error) {
-                GonObject::OnError("GON ERROR: missing a '}' somewhere");
+                GonObject::ErrorCallback("GON ERROR: missing a '}' somewhere");
                 return GonObject::null_gon;
             }
         }
@@ -193,7 +193,7 @@ GonObject LoadFromTokens(TokenStream& Tokens){
             ret.children_array.push_back(LoadFromTokens(Tokens));
 
             if(Tokens.error) {
-                GonObject::OnError("GON ERROR: missing a ']' somewhere");
+                GonObject::ErrorCallback("GON ERROR: missing a ']' somewhere");
                 return GonObject::null_gon;
             }
         }
@@ -235,7 +235,7 @@ GonObject LoadFromTokens(TokenStream& Tokens){
 
 
 
-GonObject GonObject::Load(std::string filename){
+GonObject GonObject::Load(const std::string& filename){
     std::ifstream in(filename.c_str(), std::ios::binary);
     in.seekg (0, std::ios::end);
     int length = in.tellg();
@@ -247,18 +247,18 @@ GonObject GonObject::Load(std::string filename){
 
     std::vector<std::string> Tokens = Tokenize(str);
 
-    TokenStream ts;
+    GonTokenStream ts;
     ts.current = 0;
     ts.Tokens = Tokens;
 
     return LoadFromTokens(ts);
 }
 
-GonObject GonObject::LoadFromBuffer(std::string buffer){
+GonObject GonObject::LoadFromBuffer(const std::string& buffer){
     std::string str = std::string("{")+buffer+"}";
     std::vector<std::string> Tokens = Tokenize(str);
 
-    TokenStream ts;
+    GonTokenStream ts;
     ts.current = 0;
     ts.Tokens = Tokens;
 
@@ -267,24 +267,24 @@ GonObject GonObject::LoadFromBuffer(std::string buffer){
 
 //options with error throwing
 std::string GonObject::String() const {
-    if(type != FieldType::STRING && type != FieldType::NUMBER && type != FieldType::BOOL) OnError("GON ERROR: Field is not a string");
+    if(type != FieldType::STRING && type != FieldType::NUMBER && type != FieldType::BOOL) ErrorCallback("GON ERROR: Field is not a string");
     return string_data;
 }
 int GonObject::Int() const {
-    if(type != FieldType::NUMBER) OnError("GON ERROR: Field is not a number");
+    if(type != FieldType::NUMBER) ErrorCallback("GON ERROR: Field is not a number");
     return int_data;
 }
 double GonObject::Number() const {
-    if(type != FieldType::NUMBER) OnError("GON ERROR: Field is not a number");
+    if(type != FieldType::NUMBER) ErrorCallback("GON ERROR: Field is not a number");
     return float_data;
 }
 bool GonObject::Bool() const {
-    if(type != FieldType::BOOL) OnError("GON ERROR: Field is not a bool");
+    if(type != FieldType::BOOL) ErrorCallback("GON ERROR: Field is not a bool");
     return bool_data;
 }
 
 //options with a default value
-std::string GonObject::String(std::string _default) const {
+std::string GonObject::String(const std::string& _default) const {
     if(type != FieldType::STRING && type != FieldType::NUMBER && type != FieldType::BOOL) return _default;
     return string_data;
 }
@@ -322,12 +322,12 @@ bool GonObject::Exists() const{
     return type != FieldType::NULLGON;
 }
 
-const GonObject& GonObject::ChildOrSelf(std::string child) const{
+const GonObject& GonObject::ChildOrSelf(const std::string& child) const{
     if(Contains(child)) return (*this)[child];
     return *this;
 }
 
-const GonObject& GonObject::operator[](std::string child) const {
+const GonObject& GonObject::operator[](const std::string& child) const {
     if(type == FieldType::NULLGON) return null_gon;
     if(type != FieldType::OBJECT) return null_gon;
 
@@ -411,7 +411,7 @@ void GonObject::Save(std::string filename){
     outfile.close();
 }
 
-std::string GonObject::GetOutStr(std::string tab, std::string current_tab){
+std::string GonObject::GetOutStr(const std::string& tab, const std::string& current_tab){
     std::string out = "";
 
     if(type == FieldType::OBJECT){
@@ -425,6 +425,7 @@ std::string GonObject::GetOutStr(std::string tab, std::string current_tab){
 
     if(type == FieldType::ARRAY){
         bool short_array = true;
+        int strlengthtotal = 0;
         for(int i = 0; i<children_array.size(); i++){
             if(children_array[i].type == GonObject::FieldType::ARRAY)
                 short_array = false;
@@ -432,11 +433,13 @@ std::string GonObject::GetOutStr(std::string tab, std::string current_tab){
             if(children_array[i].type == GonObject::FieldType::OBJECT)
                 short_array = false;
 
-            if(children_array[i].type == GonObject::FieldType::STRING && children_array[i].String().size() > 10)
-                short_array = false;
+            if(children_array[i].type == GonObject::FieldType::STRING)
+                strlengthtotal += children_array[i].String().size();
+
 
             if(!short_array) break;
         }
+        if(strlengthtotal > 80) short_array = false;
 
         if(short_array){
             out += "[";
@@ -492,7 +495,7 @@ void GonObject::Append(const GonObject& other){
             children_array.push_back(other[i]);
         }
     } else {
-        OnError("GON ERROR: Cannot Shallow Merge incompatible types");
+        ErrorCallback("GON ERROR: Cannot Shallow Merge incompatible types");
     }
 }
 
@@ -514,7 +517,7 @@ void GonObject::ShallowMerge(const GonObject& other, std::function<void(const Go
             children_array.push_back(other[i]);
         }
     } else {
-        OnError("GON ERROR: Cannot Shallow Merge incompatible types");
+        ErrorCallback("GON ERROR: Cannot Shallow Merge incompatible types");
     }
 }
 

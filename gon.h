@@ -12,11 +12,10 @@ class GonObject {
         static const GonObject null_gon;
 
         //default just throws the string, can be set if you want to avoid exceptions
-        static std::function<void(std::string)> OnError;
+        static std::function<void(std::string)> ErrorCallback;
 
         enum class FieldType {
             NULLGON,
-
             STRING,
             NUMBER,
             OBJECT,
@@ -42,8 +41,8 @@ class GonObject {
         static MergeMode MergePolicyAppend(const GonObject& field_a, const GonObject& field_b);
         static MergeMode MergePolicyDeepMerge(const GonObject& field_a, const GonObject& field_b);
         static MergeMode MergePolicyOverwrite(const GonObject& field_a, const GonObject& field_b);
-        static GonObject Load(std::string filename);
-        static GonObject LoadFromBuffer(std::string buffer);
+        static GonObject Load(const std::string& filename);
+        static GonObject LoadFromBuffer(const std::string& buffer);
         typedef std::function<MergeMode(const GonObject& field_a, const GonObject& field_b)> MergePolicyCallback;
 
         GonObject();
@@ -55,7 +54,7 @@ class GonObject {
         bool Bool() const;
 
         //returns a default value if the field doesn't exist or is the wrong type
-        std::string String(std::string _default) const;
+        std::string String(const std::string& _default) const;
         int Int(int _default) const;
         double Number(double _default) const;
         bool Bool(bool _default) const;
@@ -65,10 +64,10 @@ class GonObject {
         bool Exists() const; //true if non-null
 
         //returns null_gon if the field does not exist. 
-        const GonObject& operator[](std::string child) const;
+        const GonObject& operator[](const std::string& child) const;
 
         //returns self if child does not exist (useful for stuff that can either be a child or the default property of a thing)
-        const GonObject& ChildOrSelf(std::string child) const;
+        const GonObject& ChildOrSelf(const std::string& child) const;
 
         //returns self if index is not an array, 
         //all objects can be considered an array of size 1 with themselves as the member, if they are not an ARRAY or an OBJECT
@@ -87,7 +86,7 @@ class GonObject {
         //mostly used for debugging, as GON is not meant for saving files usually
         void DebugOut();
         void Save(std::string outfilename);
-        std::string GetOutStr(std::string tab = "    ", std::string current_tab = "");
+        std::string GetOutStr(const std::string& tab = "    ", const std::string& current_tab = "");
 
         //merging/combining functions
         //if self and other are an OBJECT: other will be appended to self
