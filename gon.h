@@ -3,7 +3,7 @@
 
 #pragma once
 #include <string>
-#include <map>
+#include <unordered_map>
 #include <vector>
 #include <functional>
 
@@ -29,7 +29,7 @@ class GonObject {
             OVERWRITE
         };
 
-        std::map<std::string, int> children_map;
+        std::unordered_map<std::string, int> children_map;
         std::vector<GonObject> children_array;
         int int_data;
         double float_data;
@@ -59,7 +59,7 @@ class GonObject {
         double Number(double _default) const;
         bool Bool(bool _default) const;
 
-        bool Contains(std::string child) const;
+        bool Contains(const std::string& child) const;
         bool Contains(int child) const;
         bool Exists() const; //true if non-null
 
@@ -85,7 +85,7 @@ class GonObject {
 
         //mostly used for debugging, as GON is not meant for saving files usually
         void DebugOut();
-        void Save(std::string outfilename);
+        void Save(const std::string& outfilename);
         std::string GetOutStr(const std::string& tab = "    ", const std::string& current_tab = "");
 
         //merging/combining functions

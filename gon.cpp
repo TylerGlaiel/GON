@@ -301,10 +301,10 @@ bool GonObject::Bool(bool _default) const {
     return bool_data;
 }
 
-bool GonObject::Contains(std::string child) const{
+bool GonObject::Contains(const std::string& child) const{
     if(type != FieldType::OBJECT) return false;
 
-    std::map<std::string, int>::const_iterator iter = children_map.find(child);
+    auto iter = children_map.find(child);
     if(iter != children_map.end()){
         return true;
     }
@@ -331,7 +331,7 @@ const GonObject& GonObject::operator[](const std::string& child) const {
     if(type == FieldType::NULLGON) return null_gon;
     if(type != FieldType::OBJECT) return null_gon;
 
-    std::map<std::string, int>::const_iterator iter = children_map.find(child);
+    auto iter = children_map.find(child);
     if(iter != children_map.end()){
         return children_array[iter->second];
     }
@@ -403,7 +403,7 @@ void GonObject::DebugOut(){
 }
 
 
-void GonObject::Save(std::string filename){
+void GonObject::Save(const std::string& filename){
     std::ofstream outfile(filename);
     for(int i = 0; i<children_array.size(); i++){
         outfile << children_array[i].name+" "+children_array[i].GetOutStr()+"\n";
