@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdlib>
 
+
 static bool IsWhitespace(char c){
     return c==' '||c=='\n'||c=='\r'||c=='\t';
 }
@@ -16,22 +17,13 @@ static bool IsIgnoredSymbol(char c){
     return c=='='||c==','||c==':';
 }
 
-static void DefaultGonErrorCallback(std::string err){
-    throw err;
+static void DefaultGonErrorCallback(const std::string& err){
+    throw (std::string)err;
 }
 
-std::function<void(std::string)> GonObject::ErrorCallback = DefaultGonErrorCallback;
+std::function<void(const std::string&)> GonObject::ErrorCallback = DefaultGonErrorCallback;
 const GonObject GonObject::null_gon;
-
-GonObject::MergeMode GonObject::MergePolicyAppend(const GonObject& field_a, const GonObject& field_b){
-    return MergeMode::APPEND;
-}
-GonObject::MergeMode GonObject::MergePolicyDeepMerge(const GonObject& field_a, const GonObject& field_b){
-    return MergeMode::DEEPMERGE;
-}
-GonObject::MergeMode GonObject::MergePolicyOverwrite(const GonObject& field_a, const GonObject& field_b){
-    return MergeMode::OVERWRITE;
-}
+std::string GonObject::last_accessed_named_field = "";
 
 static std::vector<std::string> Tokenize(std::string data){
     std::vector<std::string> tokens;
@@ -267,19 +259,23 @@ GonObject GonObject::LoadFromBuffer(const std::string& buffer){
 
 //options with error throwing
 std::string GonObject::String() const {
-    if(type != FieldType::STRING && type != FieldType::NUMBER && type != FieldType::BOOL) ErrorCallback("GON ERROR: Field is not a string");
+    if(type == FieldType::NULLGON) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" does not exist");
+    if(type != FieldType::STRING && type != FieldType::NUMBER && type != FieldType::BOOL) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" is not a string");
     return string_data;
 }
 int GonObject::Int() const {
-    if(type != FieldType::NUMBER) ErrorCallback("GON ERROR: Field is not a number");
+    if(type == FieldType::NULLGON) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" does not exist");
+    if(type != FieldType::NUMBER) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" is not a number");
     return int_data;
 }
 double GonObject::Number() const {
-    if(type != FieldType::NUMBER) ErrorCallback("GON ERROR: Field is not a number");
+    if(type == FieldType::NULLGON) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" does not exist");
+    if(type != FieldType::NUMBER) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" is not a number");
     return float_data;
 }
 bool GonObject::Bool() const {
-    if(type != FieldType::BOOL) ErrorCallback("GON ERROR: Field is not a bool");
+    if(type == FieldType::NULLGON) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" does not exist");
+    if(type != FieldType::BOOL) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" is not a bool");
     return bool_data;
 }
 
@@ -328,6 +324,8 @@ const GonObject& GonObject::ChildOrSelf(const std::string& child) const{
 }
 
 const GonObject& GonObject::operator[](const std::string& child) const {
+    last_accessed_named_field = child;
+
     if(type == FieldType::NULLGON) return null_gon;
     if(type != FieldType::OBJECT) return null_gon;
 
@@ -482,6 +480,83 @@ std::string GonObject::GetOutStr(const std::string& tab, const std::string& curr
 }
 
 
+//COMBINING/PATCHING/MERGING STUFF
+
+static bool ends_with(const std::string& str, const std::string& suffix){
+    if(str.size() < suffix.size()) return false;
+    for(int i = str.size()-1, j = suffix.size()-1; j>=0; j--, i--){
+        if(str[i] != suffix[j]) return false;
+    }
+    return true;
+}
+static void remove_suffix(std::string& str, const std::string& suffix){
+    if(ends_with(str, suffix)){
+        str = std::string(str.begin(), str.end() - suffix.size());
+    }
+}
+
+static GonObject::MergeMode get_patchmode(const std::string& str){
+    GonObject::MergeMode policy = GonObject::MergeMode::DEFAULT;
+    if(ends_with(str, ".overwrite")){
+        policy = GonObject::MergeMode::OVERWRITE;
+    } else if(ends_with(str, ".append")){
+        policy = GonObject::MergeMode::APPEND;
+    } else if(ends_with(str, ".merge")){
+        policy = GonObject::MergeMode::MERGE;
+    } else if(ends_with(str, ".add")){
+        policy = GonObject::MergeMode::ADD;
+    } else if(ends_with(str, ".multiply")){
+        policy = GonObject::MergeMode::MULTIPLY;
+    }
+    return policy;
+}
+
+static std::string remove_patch_suffixes(const std::string& str){
+    std::string res = str;
+    remove_suffix(res, ".overwrite");
+    remove_suffix(res, ".append");
+    remove_suffix(res, ".merge");
+    remove_suffix(res, ".add");
+    remove_suffix(res, ".multiply");
+    return res;
+}
+
+static void remove_patch_suffixes_recursive(GonObject& obj){
+    remove_suffix(obj.name, ".overwrite");
+    remove_suffix(obj.name, ".append");
+    remove_suffix(obj.name, ".merge");
+    remove_suffix(obj.name, ".add");
+    remove_suffix(obj.name, ".multiply");
+
+    if(obj.type == GonObject::FieldType::OBJECT){
+        obj.children_map.clear();
+        for(int i = 0; i<obj.size(); i++){
+            remove_patch_suffixes_recursive(obj.children_array[i]);
+            obj.children_map[obj.children_array[i].name] = i;
+        }
+    } else if(obj.type == GonObject::FieldType::ARRAY){
+        for(int i = 0; i<obj.size(); i++){
+            remove_patch_suffixes_recursive(obj.children_array[i]);
+        }
+    }
+}
+
+static bool has_patch_suffixes(const std::string& str){
+    return get_patchmode(str) != GonObject::MergeMode::DEFAULT;
+}
+
+
+GonObject::MergeMode GonObject::MergePolicyAppend(const GonObject& field_a, const GonObject& field_b){
+    return MergeMode::APPEND;
+}
+GonObject::MergeMode GonObject::MergePolicyMerge(const GonObject& field_a, const GonObject& field_b){
+    return MergeMode::MERGE;
+}
+GonObject::MergeMode GonObject::MergePolicyOverwrite(const GonObject& field_a, const GonObject& field_b){
+    return MergeMode::OVERWRITE;
+}
+
+
 void GonObject::Append(const GonObject& other){
     if(type == FieldType::NULLGON){
         *this = other;
@@ -494,8 +569,10 @@ void GonObject::Append(const GonObject& other){
         for(int i = 0; i<other.size(); i++){
             children_array.push_back(other[i]);
         }
+    } else if(type == FieldType::STRING && other.type == FieldType::STRING){
+        string_data += other.string_data;
     } else {
-        ErrorCallback("GON ERROR: Cannot Shallow Merge incompatible types");
+        ErrorCallback("GON ERROR: Append incompatible types");
     }
 }
 
@@ -523,18 +600,18 @@ void GonObject::ShallowMerge(const GonObject& other, std::function<void(const Go
 
 
 void GonObject::DeepMerge(const GonObject& other, MergePolicyCallback ObjectMergePolicy, MergePolicyCallback ArrayMergePolicy){
-    if(type == FieldType::OBJECT && other.type == FieldType::OBJECT){
-        MergeMode policy = ObjectMergePolicy(*this, other);
+    MergeMode policy = ObjectMergePolicy(*this, other);
 
-        if(policy == MergeMode::APPEND){
+    if(type == FieldType::OBJECT && other.type == FieldType::OBJECT){
+        if(policy == MergeMode::APPEND || policy == MergeMode::ADD){
             for(int i = 0; i<other.size(); i++){
                 children_array.push_back(other[i]);
                 children_map[other[i].name] = children_array.size() - 1;
             }
-        } else if(policy == MergeMode::DEEPMERGE) {
+        } else if(policy == MergeMode::MERGE || policy == MergeMode::DEFAULT || policy == MergeMode::MULTIPLY) {
             for(int i = 0; i<other.size(); i++){
                 if(Contains(other[i].name)){
-                    children_array[children_map[other[i].name]].DeepMerge(other[i]);
+                    children_array[children_map[other[i].name]].DeepMerge(other[i], ObjectMergePolicy, ArrayMergePolicy);
                 } else {
                     children_array.push_back(other[i]);
                     children_map[other[i].name] = children_array.size() - 1;
@@ -544,16 +621,14 @@ void GonObject::DeepMerge(const GonObject& other, MergePolicyCallback ObjectMerg
             *this = other;
         }
     } else if(type == FieldType::ARRAY && other.type == FieldType::ARRAY){
-        MergeMode policy = ArrayMergePolicy(*this, other);
-
-        if(policy == MergeMode::APPEND){
+        if(policy == MergeMode::APPEND || policy == MergeMode::ADD){
             for(int i = 0; i<other.size(); i++){
                 children_array.push_back(other[i]);
             }
-        } else if(policy == MergeMode::DEEPMERGE) {
+        } else if(policy == MergeMode::MERGE || policy == MergeMode::DEFAULT || policy == MergeMode::MULTIPLY) {
             for(int i = 0; i<other.size(); i++){
                 if(i < size()){
-                    children_array[i].DeepMerge(other[i]);
+                    children_array[i].DeepMerge(other[i], ObjectMergePolicy, ArrayMergePolicy);
                 } else {
                     children_array.push_back(other[i]);
                 }
@@ -561,7 +636,133 @@ void GonObject::DeepMerge(const GonObject& other, MergePolicyCallback ObjectMerg
         } else if(policy == MergeMode::OVERWRITE) {
             *this = other;
         }
+    } else if(type == FieldType::STRING && other.type == FieldType::STRING){
+        if(policy == MergeMode::ADD){
+            string_data += other.string_data;
+        } else {
+            string_data = other.string_data;
+        }
+    } else if(type == FieldType::NUMBER && other.type == FieldType::NUMBER){
+        if(policy == MergeMode::ADD){
+            float_data += other.float_data;
+            int_data = int(float_data);
+            if(float_data == int_data){
+                string_data = std::to_string(int_data);
+            } else {
+                string_data = std::to_string(float_data);
+            }
+            bool_data = float_data != 0;
+        } else if(policy == MergeMode::MULTIPLY){
+            float_data *= other.float_data;
+            int_data = int(float_data);
+            if(float_data == int_data){
+                string_data = std::to_string(int_data);
+            } else {
+                string_data = std::to_string(float_data);
+            }
+            bool_data = float_data != 0;
+        } else {
+            float_data = other.float_data;
+            int_data = other.int_data;
+            string_data = other.string_data;
+            bool_data = other.bool_data;
+        }
     } else {
         *this = other;
     }
 }
+
+
+void GonObject::PatchMerge(const GonObject& other){
+    MergeMode policy = get_patchmode(other.name);
+
+    if(type == FieldType::OBJECT && other.type == FieldType::OBJECT){
+        if(policy == MergeMode::OVERWRITE) {
+            *this = other;
+            remove_patch_suffixes_recursive(*this);
+        } else {
+            for(int i = 0; i<other.size(); i++){
+                if(has_patch_suffixes(other[i].name)){
+                    std::string other_name = remove_patch_suffixes(other[i].name);
+                    if(other_name.empty()){ //patch with self instead of child
+                        PatchMerge(other[i]);
+                    } else {
+                        if(Contains(other_name)){
+                            children_array[children_map[other_name]].PatchMerge(other[i]);
+                        } else {
+                            children_array.push_back(other[i]);
+                            remove_patch_suffixes_recursive(children_array.back());
+                            children_map[other_name] = children_array.size() - 1;
+                        }
+                    }
+                } else {
+                    if(policy == MergeMode::APPEND || policy == MergeMode::ADD){
+                        children_array.push_back(other[i]);
+                        remove_patch_suffixes_recursive(children_array.back());
+                        children_map[other[i].name] = children_array.size() - 1;
+                    } else if(policy == MergeMode::MERGE || policy == MergeMode::DEFAULT || policy == MergeMode::MULTIPLY){
+                        if(Contains(other[i].name)){
+                            children_array[children_map[other[i].name]].PatchMerge(other[i]);
+                        } else {
+                            children_array.push_back(other[i]);
+                            remove_patch_suffixes_recursive(children_array.back());
+                            children_map[other[i].name] = children_array.size() - 1;
+                        }
+                    }
+                }
+            }
+        }
+    } else if(type == FieldType::ARRAY && other.type == FieldType::ARRAY){
+        if(policy == MergeMode::APPEND || policy == MergeMode::ADD){
+            for(int i = 0; i<other.size(); i++){
+                children_array.push_back(other[i]);
+            }
+        } else if(policy == MergeMode::MERGE || policy == MergeMode::DEFAULT || policy == MergeMode::MULTIPLY) {
+            for(int i = 0; i<other.size(); i++){
+                if(i < size()){
+                    children_array[i].PatchMerge(other[i]);
+                } else {
+                    children_array.push_back(other[i]);
+                }
+            }
+        } else if(policy == MergeMode::OVERWRITE) {
+            *this = other;
+            remove_patch_suffixes_recursive(*this);
+        }
+    } else if(type == FieldType::STRING && other.type == FieldType::STRING){
+        if(policy == MergeMode::APPEND || policy == MergeMode::ADD){
+            string_data += other.string_data;
+        } else {
+            string_data = other.string_data;
+        }
+    } else if(type == FieldType::NUMBER && other.type == FieldType::NUMBER){
+        if(policy == MergeMode::ADD){
+            float_data += other.float_data;
+            int_data = int(float_data);
+            if(float_data == int_data){
+                string_data = std::to_string(int_data);
+            } else {
+                string_data = std::to_string(float_data);
+            }
+            bool_data = float_data != 0;
+        } else if(policy == MergeMode::MULTIPLY){
+            float_data *= other.float_data;
+            int_data = int(float_data);
+            if(float_data == int_data){
+                string_data = std::to_string(int_data);
+            } else {
+                string_data = std::to_string(float_data);
+            }
+            bool_data = float_data != 0;
+        } else {
+            float_data = other.float_data;
+            int_data = other.int_data;
+            string_data = other.string_data;
+            bool_data = other.bool_data;
+        }
+    } else {
+        *this = other;
+        remove_patch_suffixes_recursive(*this);
+    }
+}
+

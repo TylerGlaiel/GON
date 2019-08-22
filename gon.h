@@ -10,9 +10,13 @@
 class GonObject {
     public:
         static const GonObject null_gon;
+        static std::string last_accessed_named_field;//used for error reporting when a field is missing, 
+                                                     //this assumes you don't cache a field then try to access it later 
+                                                     //as the error report for fields uses this value for its message (to avoid creating and destroying a ton of dummy-objects)
+                                                     //this isn't a great or super accurate solution for errors, but it's better than nothing
 
         //default just throws the string, can be set if you want to avoid exceptions
-        static std::function<void(std::string)> ErrorCallback;
+        static std::function<void(const std::string&)> ErrorCallback;
 
         enum class FieldType {
             NULLGON,
@@ -24,9 +28,14 @@ class GonObject {
         };
 
         enum class MergeMode {
+            DEFAULT,
             APPEND,
-            DEEPMERGE,
-            OVERWRITE
+            MERGE,
+            OVERWRITE,
+
+            //for numbers:
+            ADD,
+            MULTIPLY
         };
 
         std::unordered_map<std::string, int> children_map;
@@ -39,7 +48,7 @@ class GonObject {
         FieldType type;
 
         static MergeMode MergePolicyAppend(const GonObject& field_a, const GonObject& field_b);
-        static MergeMode MergePolicyDeepMerge(const GonObject& field_a, const GonObject& field_b);
+        static MergeMode MergePolicyMerge(const GonObject& field_a, const GonObject& field_b);
         static MergeMode MergePolicyOverwrite(const GonObject& field_a, const GonObject& field_b);
         static GonObject Load(const std::string& filename);
         static GonObject LoadFromBuffer(const std::string& buffer);
@@ -91,6 +100,7 @@ class GonObject {
         //merging/combining functions
         //if self and other are an OBJECT: other will be appended to self
         //if self and other are an ARRAY: other will be appended to self
+        //if self and other are STRINGS: the strings are appended
         //if self is a null gon: overwrite self with other
         //otherwise: error
         //(note if a field with the same name is used multiple times, the most recently added one is mapped to the associative array lookup table, however duplicate fields will still exist)
@@ -101,11 +111,24 @@ class GonObject {
         //if self is a null gon: overwrite self with other
         //otherwise: error
         //(OnOverwrite can be specified if you want a warning or error if gons contain overlapping members)
+        //ShallowMerge is not recursive into children, DeepMerge is
         void ShallowMerge(const GonObject& other, std::function<void(const GonObject& a, const GonObject& b)> OnOverwrite = NULL);                                     
                                                   
         //if self and other are an OBJECT: fields with matching names will be DeepMerged, new fields appended
         //if self and other are an ARRAY: fields with matching indexes will be DeepMerged, additional fields appended
         //if self and other mismatch: other will overwrite self
         //ObjectMergePolicy and ArrayMergePolicy can be specified if you want to change how fields merge on a per-field basis
-        void DeepMerge(const GonObject& other, MergePolicyCallback ObjectMergePolicy = MergePolicyDeepMerge, MergePolicyCallback ArrayMergePolicy = MergePolicyDeepMerge);
+        void DeepMerge(const GonObject& other, MergePolicyCallback ObjectMergePolicy = MergePolicyMerge, MergePolicyCallback ArrayMergePolicy = MergePolicyMerge);
+
+
+        //similar to deepmerge, however the merge policy for the patch is specified in the patch itself (ex, naming a field "myfield.append" will append it's contents to the end of "myfield" in self
+        //possible suffixes: .overwrite, .append, .merge, .add, .multiply
+        //with "overwrite", no merge modes specified in sub-fields will have any effect
+        //with "append", specifying a merge mode in a sub field will use that mode for that field only
+        //"merge" is the default
+        //if the patch has node named ".append", ".overwrite", or ".merge", instead of that node getting patched to self, the contents of that node are patched with self instead
+        //if both fields are strings: .append will append the strings
+        //if both fields are numbers: .add, .multiply can be used to add/subtract numbers
+        //.add is treated as .append for non-numerical types, .multiply is treated as .merge for non-numerical types
+        void PatchMerge(const GonObject& patch);
 };
