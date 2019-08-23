@@ -42,7 +42,7 @@ A list of factories that have widget counts. Its data memebers can be accessed i
  ```   
     
 # Example 3
-An array of weekdays. Note that no quotes or commas are needed, though you can add them in if it makes it more clear for you. Its data members can be accessed in c++ like so: my_gonobject["weekdays"].Length(), my_gonobject["weekdays"][0].String();  etc
+An array of weekdays. Note that no quotes or commas are needed, though you can add them in if it makes it more clear for you. Its data members can be accessed in c++ like so: my_gonobject["weekdays"].size(), my_gonobject["weekdays"][0].String();  etc
 ```
     weekdays [Monday Tuesday Wednesday Thursday Friday Saturday Sunday]
 ```    
