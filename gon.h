@@ -58,12 +58,14 @@ class GonObject {
 
         //throw error if accessing wrong type, otherwise return correct type
         std::string String() const;
+        const char* CString() const;
         int Int() const;
         double Number() const;
         bool Bool() const;
 
         //returns a default value if the field doesn't exist or is the wrong type
         std::string String(const std::string& _default) const;
+        const char* CString(const char* _default) const;
         int Int(int _default) const;
         double Number(double _default) const;
         bool Bool(bool _default) const;
@@ -96,6 +98,12 @@ class GonObject {
         void DebugOut();
         void Save(const std::string& outfilename);
         std::string GetOutStr(const std::string& tab = "    ", const std::string& current_tab = "");
+
+        //if nullgon -> promotes to object
+        //if object or array -> adds as child
+        //otherwise, error
+        void InsertChild(const GonObject& other);
+        void InsertChild(std::string name, const GonObject& other);
 
         //merging/combining functions
         //if self and other are an OBJECT: other will be appended to self

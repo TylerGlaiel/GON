@@ -263,6 +263,12 @@ std::string GonObject::String() const {
     if(type != FieldType::STRING && type != FieldType::NUMBER && type != FieldType::BOOL) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" is not a string");
     return string_data;
 }
+const char* GonObject::CString() const {
+    if(type == FieldType::NULLGON) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" does not exist");
+    if(type != FieldType::STRING && type != FieldType::NUMBER && type != FieldType::BOOL) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" is not a string");
+    return string_data.c_str();
+}
+
 int GonObject::Int() const {
     if(type == FieldType::NULLGON) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" does not exist");
     if(type != FieldType::NUMBER) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" is not a number");
@@ -284,6 +290,11 @@ std::string GonObject::String(const std::string& _default) const {
     if(type != FieldType::STRING && type != FieldType::NUMBER && type != FieldType::BOOL) return _default;
     return string_data;
 }
+const char* GonObject::CString(const char* _default) const {
+    if(type != FieldType::STRING && type != FieldType::NUMBER && type != FieldType::BOOL) return _default;
+    return string_data.c_str();
+}
+
 int GonObject::Int(int _default) const {
     if(type != FieldType::NUMBER) return _default;
     return int_data;
@@ -338,6 +349,7 @@ const GonObject& GonObject::operator[](const std::string& child) const {
 }
 const GonObject& GonObject::operator[](int childindex) const {
     if(type != FieldType::OBJECT && type != FieldType::ARRAY) return *this;
+    if(childindex < 0 || childindex >= children_array.size()) return null_gon;
     return children_array[childindex];
 }
 int GonObject::Size() const {
@@ -554,6 +566,27 @@ GonObject::MergeMode GonObject::MergePolicyMerge(const GonObject& field_a, const
 }
 GonObject::MergeMode GonObject::MergePolicyOverwrite(const GonObject& field_a, const GonObject& field_b){
     return MergeMode::OVERWRITE;
+}
+
+
+void GonObject::InsertChild(const GonObject& other){
+    InsertChild(other.name, other);
+}
+void GonObject::InsertChild(std::string name, const GonObject& other){
+    if(type == FieldType::NULLGON){
+        type = FieldType::OBJECT;
+    }
+    
+    if(type == FieldType::OBJECT){
+        children_array.push_back(other);
+        children_array.back().name = name;
+        children_map[name] = children_array.size() - 1;
+    } else if(type == FieldType::ARRAY){
+        children_array.push_back(other);
+        children_array.back().name = "";
+    } else {
+        ErrorCallback("GON ERROR: Inserting onto incompatible types");
+    }
 }
 
 
