@@ -110,6 +110,8 @@ static std::vector<std::string> Tokenize(std::string data){
         }
     }
 
+    if(current_token != "") tokens.push_back(current_token);
+
     return tokens;
 }
 
@@ -412,14 +414,38 @@ void GonObject::DebugOut(){
     }
 }
 
+static std::string escaped_string(std::string input){
+    auto tokenized = Tokenize(input);
+    bool needs_quotes = tokenized.size() != 1 || tokenized[0] != input;
+
+    std::string out_str;
+    for(int i = 0; i<input.size(); i++){
+        if(input[i] == '\n'){
+            needs_quotes = true;
+            out_str += "\\n";
+        } else if(input[i] == '\\'){
+            needs_quotes = true;
+            out_str += "\\\\";
+        } else if(input[i] == '\"'){
+            needs_quotes = true;
+            out_str += "\\\"";
+        } else {
+            out_str += input[i];
+        }
+    }
+
+    if(needs_quotes) return "\"" + out_str + "\"";
+    return out_str;
+}
 
 void GonObject::Save(const std::string& filename){
     std::ofstream outfile(filename);
     for(int i = 0; i<children_array.size(); i++){
-        outfile << children_array[i].name+" "+children_array[i].GetOutStr()+"\n";
+        outfile << escaped_string(children_array[i].name)+" "+children_array[i].GetOutStr()+"\n";
     }
     outfile.close();
 }
+
 
 std::string GonObject::GetOutStr(const std::string& tab, const std::string& current_tab){
     std::string out = "";
@@ -427,7 +453,7 @@ std::string GonObject::GetOutStr(const std::string& tab, const std::string& curr
     if(type == FieldType::OBJECT){
         out += "{\n";
         for(int i = 0; i<children_array.size(); i++){
-            out += current_tab+tab+children_array[i].name+" "+children_array[i].GetOutStr(tab, tab+current_tab);
+            out += current_tab+tab+escaped_string(children_array[i].name)+" "+children_array[i].GetOutStr(tab, tab+current_tab);
             if(out.back() != '\n') out += "\n";
         }
         out += current_tab+"}\n";
@@ -469,7 +495,7 @@ std::string GonObject::GetOutStr(const std::string& tab, const std::string& curr
     }
 
     if(type == FieldType::STRING){
-        out += String();
+        out += escaped_string(String());
     }
 
     if(type == FieldType::NUMBER){
