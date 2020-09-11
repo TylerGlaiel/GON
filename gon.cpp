@@ -359,6 +359,9 @@ int GonObject::size() const {
     if(type != FieldType::OBJECT && type != FieldType::ARRAY) return 1;//size 1, object is self
     return (int)children_array.size();
 }
+bool GonObject::empty() const {
+    return children_array.empty();
+}
 const GonObject* GonObject::begin() const {
     if(type != FieldType::OBJECT && type != FieldType::ARRAY) return this;
     return children_array.data();

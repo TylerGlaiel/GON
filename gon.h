@@ -88,6 +88,7 @@ class GonObject {
         //compatability with std
         //all objects can be considered an array of size 1 with themselves as the member, if they are not an ARRAY or an OBJECT
         int size() const;
+        bool empty() const;
         const GonObject* begin() const;
         const GonObject* end() const;
         GonObject* begin();
