@@ -10,8 +10,8 @@
 class GonObject {
     public:
         static const GonObject null_gon;
-        static std::string last_accessed_named_field;//used for error reporting when a field is missing, 
-                                                     //this assumes you don't cache a field then try to access it later 
+        static std::string last_accessed_named_field;//used for error reporting when a field is missing,
+                                                     //this assumes you don't cache a field then try to access it later
                                                      //as the error report for fields uses this value for its message (to avoid creating and destroying a ton of dummy-objects)
                                                      //this isn't a great or super accurate solution for errors, but it's better than nothing
 
@@ -74,13 +74,13 @@ class GonObject {
         bool Contains(int child) const;
         bool Exists() const; //true if non-null
 
-        //returns null_gon if the field does not exist. 
+        //returns null_gon if the field does not exist.
         const GonObject& operator[](const std::string& child) const;
 
         //returns self if child does not exist (useful for stuff that can either be a child or the default property of a thing)
         const GonObject& ChildOrSelf(const std::string& child) const;
 
-        //returns self if index is not an array, 
+        //returns self if index is not an array,
         //all objects can be considered an array of size 1 with themselves as the member, if they are not an ARRAY or an OBJECT
         const GonObject& operator[](int childindex) const;
         int Size() const;
@@ -103,7 +103,7 @@ class GonObject {
         //if object or array -> adds as child
         //otherwise, error
         void InsertChild(const GonObject& other);
-        void InsertChild(std::string name, const GonObject& other);
+        void InsertChild(std::string cname, const GonObject& other);
 
         //merging/combining functions
         //if self and other are an OBJECT: other will be appended to self
@@ -120,8 +120,8 @@ class GonObject {
         //otherwise: error
         //(OnOverwrite can be specified if you want a warning or error if gons contain overlapping members)
         //ShallowMerge is not recursive into children, DeepMerge is
-        void ShallowMerge(const GonObject& other, std::function<void(const GonObject& a, const GonObject& b)> OnOverwrite = NULL);                                     
-                                                  
+        void ShallowMerge(const GonObject& other, std::function<void(const GonObject& a, const GonObject& b)> OnOverwrite = NULL);
+
         //if self and other are an OBJECT: fields with matching names will be DeepMerged, new fields appended
         //if self and other are an ARRAY: fields with matching indexes will be DeepMerged, additional fields appended
         //if self and other mismatch: other will overwrite self

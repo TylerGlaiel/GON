@@ -168,7 +168,7 @@ static GonObject LoadFromTokens(GonTokenStream& Tokens){
             std::string name = Tokens.Read();
 
             ret.children_array.push_back(LoadFromTokens(Tokens));
-            ret.children_map[name] = ret.children_array.size()-1;
+            ret.children_map[name] = (int)ret.children_array.size()-1;
             ret.children_array[ret.children_array.size()-1].name = name;
 
             if(Tokens.error) {
@@ -223,16 +223,12 @@ static GonObject LoadFromTokens(GonTokenStream& Tokens){
 
         return ret;
     }
-
-    return ret;
 }
-
-
 
 GonObject GonObject::Load(const std::string& filename){
     std::ifstream in(filename.c_str(), std::ios::binary);
     in.seekg (0, std::ios::end);
-    int length = in.tellg();
+    std::streamoff length = in.tellg();
     in.seekg (0, std::ios::beg);
     std::string str(length + 2, '\0');
     in.read(&str[1], length);
@@ -361,7 +357,7 @@ int GonObject::Size() const {
 
 int GonObject::size() const {
     if(type != FieldType::OBJECT && type != FieldType::ARRAY) return 1;//size 1, object is self
-    return children_array.size();
+    return (int)children_array.size();
 }
 const GonObject* GonObject::begin() const {
     if(type != FieldType::OBJECT && type != FieldType::ARRAY) return this;
@@ -461,7 +457,7 @@ std::string GonObject::GetOutStr(const std::string& tab, const std::string& curr
 
     if(type == FieldType::ARRAY){
         bool short_array = true;
-        int strlengthtotal = 0;
+        size_t strlengthtotal = 0;
         for(int i = 0; i<children_array.size(); i++){
             if(children_array[i].type == GonObject::FieldType::ARRAY)
                 short_array = false;
@@ -522,7 +518,7 @@ std::string GonObject::GetOutStr(const std::string& tab, const std::string& curr
 
 static bool ends_with(const std::string& str, const std::string& suffix){
     if(str.size() < suffix.size()) return false;
-    for(int i = str.size()-1, j = suffix.size()-1; j>=0; j--, i--){
+    for(int i = (int)str.size()-1, j = (int)suffix.size()-1; j>=0; j--, i--){
         if(str[i] != suffix[j]) return false;
     }
     return true;
@@ -598,15 +594,15 @@ GonObject::MergeMode GonObject::MergePolicyOverwrite(const GonObject& field_a, c
 void GonObject::InsertChild(const GonObject& other){
     InsertChild(other.name, other);
 }
-void GonObject::InsertChild(std::string name, const GonObject& other){
+void GonObject::InsertChild(std::string cname, const GonObject& other){
     if(type == FieldType::NULLGON){
         type = FieldType::OBJECT;
     }
-    
+
     if(type == FieldType::OBJECT){
         children_array.push_back(other);
-        children_array.back().name = name;
-        children_map[name] = children_array.size() - 1;
+        children_array.back().name = cname;
+        children_map[cname] = (int)children_array.size() - 1;
     } else if(type == FieldType::ARRAY){
         children_array.push_back(other);
         children_array.back().name = "";
@@ -622,7 +618,7 @@ void GonObject::Append(const GonObject& other){
     } if(type == FieldType::OBJECT && other.type == FieldType::OBJECT){
         for(int i = 0; i<other.size(); i++){
             children_array.push_back(other[i]);
-            children_map[other[i].name] = children_array.size() - 1;
+            children_map[other[i].name] = (int)children_array.size() - 1;
         }
     } else if(type == FieldType::ARRAY && other.type == FieldType::ARRAY){
         for(int i = 0; i<other.size(); i++){
@@ -645,7 +641,7 @@ void GonObject::ShallowMerge(const GonObject& other, std::function<void(const Go
                 children_array[children_map[other[i].name]] = other[i];
             } else {
                 children_array.push_back(other[i]);
-                children_map[other[i].name] = children_array.size() - 1;
+                children_map[other[i].name] = (int)children_array.size() - 1;
             }
         }
     } else if(type == FieldType::ARRAY && other.type == FieldType::ARRAY){
@@ -665,7 +661,7 @@ void GonObject::DeepMerge(const GonObject& other, MergePolicyCallback ObjectMerg
         if(policy == MergeMode::APPEND || policy == MergeMode::ADD){
             for(int i = 0; i<other.size(); i++){
                 children_array.push_back(other[i]);
-                children_map[other[i].name] = children_array.size() - 1;
+                children_map[other[i].name] = (int)children_array.size() - 1;
             }
         } else if(policy == MergeMode::MERGE || policy == MergeMode::DEFAULT || policy == MergeMode::MULTIPLY) {
             for(int i = 0; i<other.size(); i++){
@@ -673,7 +669,7 @@ void GonObject::DeepMerge(const GonObject& other, MergePolicyCallback ObjectMerg
                     children_array[children_map[other[i].name]].DeepMerge(other[i], ObjectMergePolicy, ArrayMergePolicy);
                 } else {
                     children_array.push_back(other[i]);
-                    children_map[other[i].name] = children_array.size() - 1;
+                    children_map[other[i].name] = (int)children_array.size() - 1;
                 }
             }
         } else if(policy == MergeMode::OVERWRITE) {
@@ -751,21 +747,21 @@ void GonObject::PatchMerge(const GonObject& other){
                         } else {
                             children_array.push_back(other[i]);
                             remove_patch_suffixes_recursive(children_array.back());
-                            children_map[other_name] = children_array.size() - 1;
+                            children_map[other_name] = (int)children_array.size() - 1;
                         }
                     }
                 } else {
                     if(policy == MergeMode::APPEND || policy == MergeMode::ADD){
                         children_array.push_back(other[i]);
                         remove_patch_suffixes_recursive(children_array.back());
-                        children_map[other[i].name] = children_array.size() - 1;
+                        children_map[other[i].name] = (int)children_array.size() - 1;
                     } else if(policy == MergeMode::MERGE || policy == MergeMode::DEFAULT || policy == MergeMode::MULTIPLY){
                         if(Contains(other[i].name)){
                             children_array[children_map[other[i].name]].PatchMerge(other[i]);
                         } else {
                             children_array.push_back(other[i]);
                             remove_patch_suffixes_recursive(children_array.back());
-                            children_map[other[i].name] = children_array.size() - 1;
+                            children_map[other[i].name] = (int)children_array.size() - 1;
                         }
                     }
                 }
@@ -824,4 +820,3 @@ void GonObject::PatchMerge(const GonObject& other){
         remove_patch_suffixes_recursive(*this);
     }
 }
-
