@@ -356,6 +356,7 @@ int GonObject::Size() const {
 
 
 int GonObject::size() const {
+    if(type == FieldType::NULLGON) return 0;
     if(type != FieldType::OBJECT && type != FieldType::ARRAY) return 1;//size 1, object is self
     return (int)children_array.size();
 }
@@ -367,6 +368,7 @@ const GonObject* GonObject::begin() const {
     return children_array.data();
 }
 const GonObject* GonObject::end() const {
+    if(type == FieldType::NULLGON) return this;
     if(type != FieldType::OBJECT && type != FieldType::ARRAY) return this+1;
     return children_array.data()+children_array.size();
 }
@@ -375,6 +377,7 @@ GonObject* GonObject::begin() {
     return children_array.data();
 }
 GonObject* GonObject::end() {
+    if(type == FieldType::NULLGON) return this;
     if(type != FieldType::OBJECT && type != FieldType::ARRAY) return this+1;
     return children_array.data()+children_array.size();
 }
