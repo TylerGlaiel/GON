@@ -23,6 +23,7 @@ static void DefaultGonErrorCallback(const std::string& err){
 
 std::function<void(const std::string&)> GonObject::ErrorCallback = DefaultGonErrorCallback;
 const GonObject GonObject::null_gon;
+GonObject GonObject::non_const_null_gon;
 std::string GonObject::last_accessed_named_field = "";
 
 static std::vector<std::string> Tokenize(std::string data){
@@ -331,6 +332,10 @@ const GonObject& GonObject::ChildOrSelf(const std::string& child) const{
     if(Contains(child)) return (*this)[child];
     return *this;
 }
+GonObject& GonObject::ChildOrSelf(const std::string& child){
+    if(Contains(child)) return (*this)[child];
+    return *this;
+}
 
 const GonObject& GonObject::operator[](const std::string& child) const {
     last_accessed_named_field = child;
@@ -345,9 +350,27 @@ const GonObject& GonObject::operator[](const std::string& child) const {
 
     return null_gon;
 }
+GonObject& GonObject::operator[](const std::string& child) {
+    last_accessed_named_field = child;
+
+    if(type == FieldType::NULLGON) return non_const_null_gon;
+    if(type != FieldType::OBJECT) return non_const_null_gon;
+
+    auto iter = children_map.find(child);
+    if(iter != children_map.end()){
+        return children_array[iter->second];
+    }
+
+    return non_const_null_gon;
+}
 const GonObject& GonObject::operator[](int childindex) const {
     if(type != FieldType::OBJECT && type != FieldType::ARRAY) return *this;
     if(childindex < 0 || childindex >= children_array.size()) return null_gon;
+    return children_array[childindex];
+}
+GonObject& GonObject::operator[](int childindex) {
+    if(type != FieldType::OBJECT && type != FieldType::ARRAY) return *this;
+    if(childindex < 0 || childindex >= children_array.size()) return non_const_null_gon;
     return children_array[childindex];
 }
 int GonObject::Size() const {

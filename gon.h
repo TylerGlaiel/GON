@@ -10,6 +10,7 @@
 class GonObject {
     public:
         static const GonObject null_gon;
+        static GonObject non_const_null_gon;
         static std::string last_accessed_named_field;//used for error reporting when a field is missing,
                                                      //this assumes you don't cache a field then try to access it later
                                                      //as the error report for fields uses this value for its message (to avoid creating and destroying a ton of dummy-objects)
@@ -76,13 +77,16 @@ class GonObject {
 
         //returns null_gon if the field does not exist.
         const GonObject& operator[](const std::string& child) const;
+        GonObject& operator[](const std::string& child);
 
         //returns self if child does not exist (useful for stuff that can either be a child or the default property of a thing)
         const GonObject& ChildOrSelf(const std::string& child) const;
+        GonObject& ChildOrSelf(const std::string& child);
 
         //returns self if index is not an array,
         //all objects can be considered an array of size 1 with themselves as the member, if they are not an ARRAY or an OBJECT
         const GonObject& operator[](int childindex) const;
+        GonObject& operator[](int childindex);
         int Size() const;
 
         //compatability with std
