@@ -48,5 +48,13 @@ An array of weekdays. Note that no quotes or commas are needed, though you can a
 ```    
 
 
+# Merging & Combining Gon Objects
+
+Merging & Combining functions were added to make it easier for people to make stackable mods for games, as a mod can specify just the changes to the original data that it wants to supply, with extensive amounts of customizability for how individual fields get combined.
+
+Todo: Better document GON Functions Append, ShallowMerge, DeepMerge, and PatchMerge
+PatchMerge in particulat has its own syntax for how to apply a patch to an existing Gon object.
+
+
 # Syntax Highlighting
 https://github.com/henriquel1997/gon_vs_syntax_highlighting
