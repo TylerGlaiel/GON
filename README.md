@@ -46,4 +46,7 @@ An array of weekdays. Note that no quotes or commas are needed, though you can a
 ```
     weekdays [Monday Tuesday Wednesday Thursday Friday Saturday Sunday]
 ```    
-    
+
+
+# Syntax Highlighting
+https://github.com/henriquel1997/gon_vs_syntax_highlighting
