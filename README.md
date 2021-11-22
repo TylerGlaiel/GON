@@ -10,6 +10,8 @@ GON ("Glaiel Object Notation") is "json without the crap", meant to be a very ea
 
 The only basic data type GON loads are strings. The c++ interface has shortcuts for converting those strings to ints, doubles, and bools on-demand instead of when loading. All entries in a GON object are a key followed by its data. The key must be a string, the data can either be a string, an array (of data), or another GON object. Strings do not need quotations marks around them unless you want them to include whitespace. Commas and equals signs are optional.
 
+This is NOT meant to be a data exchange format like json. There is little functionality here for generating GON files or editing them in memory. The use case here is to make for human editable data files, and thus the code is designed and optimized for just that case (the "human to computer" pipeline)
+
 # Example 1
 A list of widget counts. This is a list of 4 widgets and their values. This is a valid GON file, and its data memebers can be accessed in c++ like so: my_gonobject["whirly_widgets"].Number();  etc
 ```
