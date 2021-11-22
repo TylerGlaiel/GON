@@ -47,6 +47,18 @@ An array of weekdays. Note that no quotes or commas are needed, though you can a
     weekdays [Monday Tuesday Wednesday Thursday Friday Saturday Sunday]
 ```    
 
+# Field Accessors
+You can use the following accessor functions to access values of fields in C++:
+```   
+    myobject.String();
+    myobject.CString(); //note: if you later destroy myobject or edit its parent, the c-string returned here will no longer point to valid memory
+    myobject.Int();
+    myobject.Number();
+    myobject.Bool();
+```   
+
+When accessing fields in C++ code, you can optionally specify a default value to return if the field does not exist (ex: myobject.Number(0), myobject.String("None")). 
+When accessing subfields (with operator[]), if the field asked for here does not exist, operator[] will return an empty object instead. You can chain as many square bracket operators together as you want, if any of the fields in the chain do not exist, the final result will not exist (and the default value will be returned instead)
 
 # Merging & Combining Gon Objects
 
