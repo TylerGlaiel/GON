@@ -21,6 +21,19 @@ static void DefaultGonErrorCallback(const std::string& err){
     throw (std::string)err;
 }
 
+static bool ends_with(const std::string& str, const std::string& suffix){
+    if(str.size() < suffix.size()) return false;
+    for(int i = (int)str.size()-1, j = (int)suffix.size()-1; j>=0; j--, i--){
+        if(str[i] != suffix[j]) return false;
+    }
+    return true;
+}
+static void remove_suffix(std::string& str, const std::string& suffix){
+    if(ends_with(str, suffix)){
+        str = std::string(str.begin(), str.end() - suffix.size());
+    }
+}
+
 std::function<void(const std::string&)> GonObject::ErrorCallback = DefaultGonErrorCallback;
 const GonObject GonObject::null_gon;
 GonObject GonObject::non_const_null_gon;
@@ -91,10 +104,8 @@ static std::vector<std::string> Tokenize(std::string data){
             } else if(data[i] == '\\'){
                 escaped = true;
             } else if(!escaped && data[i] == '"'){
-                if(current_token != ""){
-                    tokens.push_back(current_token);
-                    current_token = "";
-                }
+                tokens.push_back(current_token);
+                current_token = "";
                 inString = false;
                 continue;
             } else {
@@ -278,6 +289,23 @@ double GonObject::Number() const {
     if(type != FieldType::NUMBER) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" is not a number");
     return float_data;
 }
+double GonObject::Percent() const {
+    if(type == FieldType::NULLGON) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" does not exist");
+    if(type == FieldType::NUMBER) return float_data; //should this be divided by 100 as well?
+    if(type == FieldType::STRING){
+        std::string pstr = string_data;
+        if(pstr.back() == '%'){
+            remove_suffix(pstr, (std::string)"%");
+            char* endptr;
+            double res = strtod(pstr.c_str(), &endptr); //todo: switch to strtod_l instead of the remove suffix hack
+            if(*endptr == 0){
+                return res / 100.0;
+            }
+        }
+    }
+    ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" is not a percent");
+    return 0;
+}
 bool GonObject::Bool() const {
     if(type == FieldType::NULLGON) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" does not exist");
     if(type != FieldType::BOOL) ErrorCallback("GON ERROR: Field \""+(!name.empty()?name:last_accessed_named_field)+"\" is not a bool");
@@ -301,6 +329,22 @@ int GonObject::Int(int _default) const {
 double GonObject::Number(double _default) const {
     if(type != FieldType::NUMBER) return _default;
     return float_data;
+}
+double GonObject::Percent(double _default) const {
+    if(type == FieldType::NULLGON) return _default;
+    if(type == FieldType::NUMBER) return float_data; //should this be divided by 100 as well?
+    if(type == FieldType::STRING){
+        std::string pstr = string_data;
+        if(pstr.back() == '%'){
+            remove_suffix(pstr, (std::string)"%");
+            char* endptr;
+            double res = strtod(pstr.c_str(), &endptr); //todo: switch to strtod_l instead of the remove suffix hack
+            if(*endptr == 0){
+                return res / 100.0;
+            }
+        }
+    }
+    return _default;
 }
 bool GonObject::Bool(bool _default) const {
     if(type != FieldType::BOOL) return _default;
@@ -327,6 +371,21 @@ bool GonObject::Contains(int child) const{
 bool GonObject::Exists() const{
     return type != FieldType::NULLGON;
 }
+bool GonObject::IsPercent() const{
+    if(type == FieldType::STRING){
+        std::string pstr = string_data;
+        if(pstr.back() == '%'){
+            remove_suffix(pstr, (std::string)"%");
+            char* endptr;
+            double res = strtod(pstr.c_str(), &endptr); //todo: switch to strtod_l instead of the remove suffix hack
+            if(*endptr == 0){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 
 const GonObject& GonObject::ChildOrSelf(const std::string& child) const{
     if(Contains(child)) return (*this)[child];
@@ -335,6 +394,15 @@ const GonObject& GonObject::ChildOrSelf(const std::string& child) const{
 GonObject& GonObject::ChildOrSelf(const std::string& child){
     if(Contains(child)) return (*this)[child];
     return *this;
+}
+
+const GonObject& GonObject::FieldInChildOrSelf(const std::string& child, const std::string& field) const {
+    if((*this)[child][field].Exists()) return (*this)[child][field];
+    return (*this)[field];
+}
+GonObject& GonObject::FieldInChildOrSelf(const std::string& child, const std::string& field) {
+    if((*this)[child][field].Exists()) return (*this)[child][field];
+    return (*this)[field];
 }
 
 const GonObject& GonObject::operator[](const std::string& child) const {
@@ -472,16 +540,16 @@ void GonObject::Save(const std::string& filename){
 }
 
 
-std::string GonObject::GetOutStr(const std::string& tab, const std::string& current_tab){
+std::string GonObject::GetOutStr(const std::string& tab, const std::string& line_break, const std::string& current_tab){
     std::string out = "";
 
     if(type == FieldType::OBJECT){
-        out += "{\n";
+        out += "{"+line_break;
         for(int i = 0; i<children_array.size(); i++){
-            out += current_tab+tab+escaped_string(children_array[i].name)+" "+children_array[i].GetOutStr(tab, tab+current_tab);
-            if(out.back() != '\n') out += "\n";
+            out += current_tab+tab+escaped_string(children_array[i].name)+" "+children_array[i].GetOutStr(tab, line_break, tab+current_tab);
+            if(!ends_with(out, line_break)) out += line_break;
         }
-        out += current_tab+"}\n";
+        out += current_tab+"}"+line_break;
     }
 
     if(type == FieldType::ARRAY){
@@ -505,17 +573,17 @@ std::string GonObject::GetOutStr(const std::string& tab, const std::string& curr
         if(short_array){
             out += "[";
             for(int i = 0; i<children_array.size(); i++){
-                out += children_array[i].GetOutStr(tab, tab+current_tab);
+                out += children_array[i].GetOutStr(tab, line_break, tab+current_tab);
                 if(i != children_array.size()-1) out += " ";
             }
-            out += "]\n";
+            out += "]"+line_break;
         } else {
-            out += "[\n";
+            out += "["+line_break;
             for(int i = 0; i<children_array.size(); i++){
-                out += current_tab+tab+children_array[i].GetOutStr(tab, tab+current_tab);
-                if(out.back() != '\n') out += "\n";
+                out += current_tab+tab+children_array[i].GetOutStr(tab, line_break, tab+current_tab);
+                if(!ends_with(out, line_break)) out += line_break;
             }
-            out += current_tab+"]\n";
+            out += current_tab+"]"+line_break;
         }
     }
 
@@ -544,19 +612,6 @@ std::string GonObject::GetOutStr(const std::string& tab, const std::string& curr
 
 
 //COMBINING/PATCHING/MERGING STUFF
-
-static bool ends_with(const std::string& str, const std::string& suffix){
-    if(str.size() < suffix.size()) return false;
-    for(int i = (int)str.size()-1, j = (int)suffix.size()-1; j>=0; j--, i--){
-        if(str[i] != suffix[j]) return false;
-    }
-    return true;
-}
-static void remove_suffix(std::string& str, const std::string& suffix){
-    if(ends_with(str, suffix)){
-        str = std::string(str.begin(), str.end() - suffix.size());
-    }
-}
 
 static GonObject::MergeMode get_patchmode(const std::string& str){
     GonObject::MergeMode policy = GonObject::MergeMode::DEFAULT;

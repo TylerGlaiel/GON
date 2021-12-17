@@ -62,6 +62,7 @@ class GonObject {
         const char* CString() const;
         int Int() const;
         double Number() const;
+        double Percent() const;
         bool Bool() const;
 
         //returns a default value if the field doesn't exist or is the wrong type
@@ -69,11 +70,13 @@ class GonObject {
         const char* CString(const char* _default) const;
         int Int(int _default) const;
         double Number(double _default) const;
+        double Percent(double _default) const; //if field is a number-parsable string that ends with a %, return that number divided by 100, otherwise just return the number
         bool Bool(bool _default) const;
 
         bool Contains(const std::string& child) const;
         bool Contains(int child) const;
         bool Exists() const; //true if non-null
+        bool IsPercent() const; //while regular numbers can be read as percents, "is percent" only returns true if the string ends with a %
 
         //returns null_gon if the field does not exist.
         const GonObject& operator[](const std::string& child) const;
@@ -82,6 +85,10 @@ class GonObject {
         //returns self if child does not exist (useful for stuff that can either be a child or the default property of a thing)
         const GonObject& ChildOrSelf(const std::string& child) const;
         GonObject& ChildOrSelf(const std::string& child);
+
+        //checks for [child][field], if that doesnt exists returns [field] instead. look I was using this pattern a ton with things that could have optional variants
+        const GonObject& FieldInChildOrSelf(const std::string& child, const std::string& field) const;
+        GonObject& FieldInChildOrSelf(const std::string& child, const std::string& field);
 
         //returns self if index is not an array,
         //all objects can be considered an array of size 1 with themselves as the member, if they are not an ARRAY or an OBJECT
@@ -102,7 +109,7 @@ class GonObject {
         //mostly used for debugging, as GON is not meant for saving files usually
         void DebugOut();
         void Save(const std::string& outfilename);
-        std::string GetOutStr(const std::string& tab = "    ", const std::string& current_tab = "");
+        std::string GetOutStr(const std::string& tab = "    ", const std::string& line_break = "\n", const std::string& current_tab = "");
 
         //if nullgon -> promotes to object
         //if object or array -> adds as child
