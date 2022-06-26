@@ -107,9 +107,10 @@ class GonObject {
 
 
         //mostly used for debugging, as GON is not meant for saving files usually
-        void DebugOut();
-        void Save(const std::string& outfilename);
-        std::string GetOutStr(const std::string& tab = "    ", const std::string& line_break = "\n", const std::string& current_tab = "");
+        void DebugOut() const;
+        void Save(const std::string& outfilename) const;
+        std::string SaveToStr(bool compact = false) const;
+        std::string GetOutStr(const std::string& tab = "    ", const std::string& line_break = "\n", const std::string& current_tab = "") const;
 
         //if nullgon -> promotes to object
         //if object or array -> adds as child

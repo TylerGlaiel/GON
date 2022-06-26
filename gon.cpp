@@ -473,7 +473,7 @@ GonObject* GonObject::end() {
     return children_array.data()+children_array.size();
 }
 
-void GonObject::DebugOut(){
+void GonObject::DebugOut() const {
     if(type == FieldType::OBJECT){
         std::cout << name << " is object {" << std::endl;
         for(int i = 0; i<children_array.size(); i++){
@@ -531,16 +531,24 @@ static std::string escaped_string(std::string input){
     return out_str;
 }
 
-void GonObject::Save(const std::string& filename){
+void GonObject::Save(const std::string& filename) const {
     std::ofstream outfile(filename);
     for(int i = 0; i<children_array.size(); i++){
         outfile << escaped_string(children_array[i].name)+" "+children_array[i].GetOutStr()+"\n";
     }
     outfile.close();
 }
+std::string GonObject::SaveToStr(bool compact) const {
+    std::string res;
+    for(int i = 0; i<children_array.size(); i++) {
+        if(!res.empty()) res += (compact?" ":"\n");
+        res += escaped_string(children_array[i].name)+" "+children_array[i].GetOutStr(compact?"":"    ", compact?" ":"\n");
+    }
+    return res;
+}
 
 
-std::string GonObject::GetOutStr(const std::string& tab, const std::string& line_break, const std::string& current_tab){
+std::string GonObject::GetOutStr(const std::string& tab, const std::string& line_break, const std::string& current_tab) const {
     std::string out = "";
 
     if(type == FieldType::OBJECT){
