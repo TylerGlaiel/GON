@@ -74,6 +74,7 @@ class GonObject {
         bool Bool(bool _default) const;
 
         bool Contains(const std::string& child) const;
+        bool ContainsNthChildWithName(const std::string& child, int index) const; //similar to just operator[], however if index is more than 0 then it skips the first N children with that name (ex, index=1 searches for the *second* field named "child" in the object)
         bool Contains(int child) const;
         bool Exists() const; //true if non-null
         bool IsPercent() const; //while regular numbers can be read as percents, "is percent" only returns true if the string ends with a %
@@ -85,6 +86,10 @@ class GonObject {
         //returns self if child does not exist (useful for stuff that can either be a child or the default property of a thing)
         const GonObject& ChildOrSelf(const std::string& child) const;
         GonObject& ChildOrSelf(const std::string& child);
+
+        //similar to just operator[], however if index is more than 0 then it skips the first N children with that name (ex, index=1 searches for the *second* field named "child" in the object)
+        const GonObject& NthChildWithName(const std::string& child, int index) const;
+        GonObject& NthChildWithName(const std::string& child, int index);
 
         //checks for [child][field], if that doesnt exists returns [field] instead. look I was using this pattern a ton with things that could have optional variants
         const GonObject& FieldInChildOrSelf(const std::string& child, const std::string& field) const;

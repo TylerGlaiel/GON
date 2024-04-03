@@ -334,8 +334,8 @@ double GonObject::Percent(double _default) const {
     if(type == FieldType::NULLGON) return _default;
     if(type == FieldType::NUMBER) return float_data; //should this be divided by 100 as well?
     if(type == FieldType::STRING){
-        std::string pstr = string_data;
-        if(pstr.back() == '%'){
+        if(string_data.back() == '%'){
+            std::string pstr = string_data;
             remove_suffix(pstr, (std::string)"%");
             char* endptr;
             double res = strtod(pstr.c_str(), &endptr); //todo: switch to strtod_l instead of the remove suffix hack
@@ -357,6 +357,19 @@ bool GonObject::Contains(const std::string& child) const{
     auto iter = children_map.find(child);
     if(iter != children_map.end()){
         return true;
+    }
+
+    return false;
+}
+bool GonObject::ContainsNthChildWithName(const std::string& child, int index) const {
+    if(type != FieldType::OBJECT) return false;
+
+    if(index == 0) return Contains(child);
+
+    for(auto& entry : children_array) {
+        if(entry.name == child) {
+            if(index-- == 0) return true;
+        }
     }
 
     return false;
@@ -394,6 +407,37 @@ const GonObject& GonObject::ChildOrSelf(const std::string& child) const{
 GonObject& GonObject::ChildOrSelf(const std::string& child){
     if(Contains(child)) return (*this)[child];
     return *this;
+}
+
+const GonObject& GonObject::NthChildWithName(const std::string& child, int index) const {
+    last_accessed_named_field = child;
+    if(type == FieldType::NULLGON) return null_gon;
+    if(type != FieldType::OBJECT) return null_gon;
+
+    if(index == 0) return (*this)[child];
+
+    for(auto& entry : children_array) {
+        if(entry.name == child) {
+            if(index-- == 0) return entry;
+        }
+    }
+
+    return null_gon;
+}
+GonObject& GonObject::NthChildWithName(const std::string& child, int index) {
+    last_accessed_named_field = child;
+    if(type == FieldType::NULLGON) return non_const_null_gon;
+    if(type != FieldType::OBJECT) return non_const_null_gon;
+
+    if(index == 0) return (*this)[child];
+
+    for(auto& entry : children_array) {
+        if(entry.name == child) {
+            if(index-- == 0) return entry;
+        }
+    }
+
+    return non_const_null_gon;
 }
 
 const GonObject& GonObject::FieldInChildOrSelf(const std::string& child, const std::string& field) const {
@@ -533,17 +577,16 @@ static std::string escaped_string(std::string input){
 
 void GonObject::Save(const std::string& filename) const {
     std::ofstream outfile(filename);
-    for(int i = 0; i<children_array.size(); i++){
-        outfile << escaped_string(children_array[i].name)+" "+children_array[i].GetOutStr()+"\n";
-    }
+    outfile << SaveToStr(false);
     outfile.close();
 }
 std::string GonObject::SaveToStr(bool compact) const {
     std::string res;
-    for(int i = 0; i<children_array.size(); i++) {
+    res += escaped_string(name)+" "+GetOutStr(compact?"":"    ", compact?" ":"\n");
+    /*for(int i = 0; i<children_array.size(); i++) {
         if(!res.empty()) res += (compact?" ":"\n");
         res += escaped_string(children_array[i].name)+" "+children_array[i].GetOutStr(compact?"":"    ", compact?" ":"\n");
-    }
+    }*/
     return res;
 }
 
@@ -727,13 +770,20 @@ void GonObject::ShallowMerge(const GonObject& other, std::function<void(const Go
     if(type == FieldType::NULLGON){
         *this = other;
     } else if(type == FieldType::OBJECT && other.type == FieldType::OBJECT){
+        std::unordered_map<std::string, int> field_counts; //todo: do this with less allocations
+
         for(int i = 0; i<other.size(); i++){
-            if(Contains(other[i].name)){
-                if(OnOverwrite) OnOverwrite((*this)[other[i].name], other[i]);
-                children_array[children_map[other[i].name]] = other[i];
+            const std::string& fieldname = other[i].name;
+
+            if(ContainsNthChildWithName(fieldname, field_counts[fieldname])){
+                GonObject& myfield = NthChildWithName(fieldname, field_counts[fieldname]);
+
+                if(OnOverwrite) OnOverwrite(myfield, other[i]);
+                myfield = other[i];
+                field_counts[fieldname]++;
             } else {
                 children_array.push_back(other[i]);
-                children_map[other[i].name] = (int)children_array.size() - 1;
+                children_map[fieldname] = (int)children_array.size() - 1;
             }
         }
     } else if(type == FieldType::ARRAY && other.type == FieldType::ARRAY){
@@ -756,9 +806,14 @@ void GonObject::DeepMerge(const GonObject& other, MergePolicyCallback ObjectMerg
                 children_map[other[i].name] = (int)children_array.size() - 1;
             }
         } else if(policy == MergeMode::MERGE || policy == MergeMode::DEFAULT || policy == MergeMode::MULTIPLY) {
+            std::unordered_map<std::string, int> field_counts; //todo: do this with less allocations
+
             for(int i = 0; i<other.size(); i++){
-                if(Contains(other[i].name)){
-                    children_array[children_map[other[i].name]].DeepMerge(other[i], ObjectMergePolicy, ArrayMergePolicy);
+                const std::string& fieldname = other[i].name;
+
+                if(ContainsNthChildWithName(fieldname, field_counts[fieldname])) {
+                    NthChildWithName(fieldname, field_counts[fieldname]).DeepMerge(other[i], ObjectMergePolicy, ArrayMergePolicy);
+                    field_counts[fieldname]++;
                 } else {
                     children_array.push_back(other[i]);
                     children_map[other[i].name] = (int)children_array.size() - 1;
@@ -828,14 +883,17 @@ void GonObject::PatchMerge(const GonObject& other){
             *this = other;
             remove_patch_suffixes_recursive(*this);
         } else {
+            std::unordered_map<std::string, int> field_counts; //todo: do this with less allocations
+
             for(int i = 0; i<other.size(); i++){
                 if(has_patch_suffixes(other[i].name)){
                     std::string other_name = remove_patch_suffixes(other[i].name);
                     if(other_name.empty()){ //patch with self instead of child
                         PatchMerge(other[i]);
                     } else {
-                        if(Contains(other_name)){
-                            children_array[children_map[other_name]].PatchMerge(other[i]);
+                        if(ContainsNthChildWithName(other_name, field_counts[other_name])) {
+                            NthChildWithName(other_name, field_counts[other_name]).PatchMerge(other[i]);
+                            field_counts[other_name]++;
                         } else {
                             children_array.push_back(other[i]);
                             remove_patch_suffixes_recursive(children_array.back());
@@ -848,8 +906,10 @@ void GonObject::PatchMerge(const GonObject& other){
                         remove_patch_suffixes_recursive(children_array.back());
                         children_map[other[i].name] = (int)children_array.size() - 1;
                     } else if(policy == MergeMode::MERGE || policy == MergeMode::DEFAULT || policy == MergeMode::MULTIPLY){
-                        if(Contains(other[i].name)){
-                            children_array[children_map[other[i].name]].PatchMerge(other[i]);
+                        const std::string& fieldname = other[i].name;
+                        if(ContainsNthChildWithName(fieldname, field_counts[fieldname])) {
+                            NthChildWithName(fieldname, field_counts[fieldname]).PatchMerge(other[i]);
+                            field_counts[fieldname]++;
                         } else {
                             children_array.push_back(other[i]);
                             remove_patch_suffixes_recursive(children_array.back());
